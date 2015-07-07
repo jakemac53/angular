@@ -3,13 +3,23 @@ library angular2.transform.common.options_reader;
 import 'package:barback/barback.dart';
 import 'annotation_matcher.dart';
 import 'mirror_mode.dart';
+import 'logging.dart';
 import 'options.dart';
 
 TransformerOptions parseBarbackSettings(BarbackSettings settings) {
   var config = settings.configuration;
-  var entryPoints = _readFileList(config, ENTRY_POINT_PARAM);
-  var reflectionEntryPoints =
-      _readFileList(config, REFLECTION_ENTRY_POINT_PARAM);
+  var entryPoints;
+  if (config[REFLECTION_ENTRY_POINT_PARAM] != null) {
+    logger.info('The transformer option `reflection_entry_points` has been '
+        'deprecated. You should now only list `entry_points`, which are the '
+        'files that contain a call to `bootstrap`. You also no longer need to '
+        'set up your own `ReflectionCapabilities` so any code referring to '
+        'that should be removed, otherwise it will transitively import '
+        'dart:mirrors which will have a negative size impact on your app.');
+    entryPoints = _readFileList(config, REFLECTION_ENTRY_POINT_PARAM);
+  } else {
+    entryPoints = _readFileList(config, ENTRY_POINT_PARAM);
+  }
   var initReflector =
       _readBool(config, INIT_REFLECTOR_PARAM, defaultValue: true);
   var inlineViews = _readBool(config, INLINE_VIEWS_PARAM, defaultValue: true);
@@ -32,7 +42,6 @@ TransformerOptions parseBarbackSettings(BarbackSettings settings) {
   var optimizationPhases = _readInt(config, OPTIMIZATION_PHASES_PARAM,
       defaultValue: DEFAULT_OPTIMIZATION_PHASES);
   return new TransformerOptions(entryPoints,
-      reflectionEntryPoints: reflectionEntryPoints,
       modeName: settings.mode.name,
       mirrorMode: mirrorMode,
       initReflector: initReflector,

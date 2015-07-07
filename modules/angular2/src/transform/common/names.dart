@@ -1,5 +1,9 @@
 library angular2.transform.common.names;
 
+const ANGULAR_IMPORT = 'package:angular2/angular2.dart';
+const ANGULAR_STATIC_IMPORT = 'package:angular2/angular2_static.dart';
+const BOOTSTRAP_NAME = 'bootstrap';
+const BOOTSTRAP_STATIC_NAME = 'bootstrapStatic';
 const SETUP_METHOD_NAME = 'initReflector';
 const REFLECTOR_VAR_NAME = 'reflector';
 const TRANSFORM_DYNAMIC_MODE = 'transform_dynamic';

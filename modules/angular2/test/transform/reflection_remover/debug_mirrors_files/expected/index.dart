@@ -11,12 +11,9 @@ library angular2.test.transform.reflection_remover.debug_mirrors_files.expected;
 var code = """
 library web_foo;
 
-import 'package:angular2/src/core/application.dart';
-import 'package:angular2/src/reflection/reflection.dart';
-import 'package:angular2/src/reflection/debug_reflection_capabilities.dart';import 'index.ng_deps.dart' as ngStaticInit0;
+import 'package:angular2/angular2_debug.dart';import 'index.ng_deps.dart' as ngStaticInit;
 
 void main() {
-  reflector.reflectionCapabilities = new ReflectionCapabilities();ngStaticInit0.initReflector(reflector);
-  bootstrap(MyComponent);
+  bootstrapDebug(MyComponent, ngStaticInit.initReflector);
 }
 """;

@@ -32,136 +32,125 @@ class Rewriter {
   String rewrite(CompilationUnit node) {
     if (node == null) throw new ArgumentError.notNull('node');
 
-    var visitor = new _FindReflectionCapabilitiesVisitor(_tester);
+    var visitor = new _FindPartsVisitor(_tester);
     node.accept(visitor);
-    if (visitor.reflectionCapabilityImports.isEmpty) {
-      logger.error('Failed to find ${REFLECTION_CAPABILITIES_NAME} import.');
+    if (visitor.angular2Import == null) {
+      logger.error('Failed to find ${ANGULAR_IMPORT} import.');
       return _code;
     }
-    if (visitor.reflectionCapabilityAssignments.isEmpty) {
-      logger.error('Failed to find ${REFLECTION_CAPABILITIES_NAME} '
-          'instantiation.');
+    if (visitor.bootstrapCall == null) {
+      logger.error('Failed to find ${BOOTSTRAP_NAME} invocation.');
       return _code;
     }
 
-    var compare = (AstNode a, AstNode b) => b.offset - a.offset;
-    visitor.reflectionCapabilityImports.sort(compare);
-    visitor.reflectionCapabilityAssignments.sort(compare);
-
-    var importAdded = false;
     var buf = new StringBuffer();
-    var idx = visitor.reflectionCapabilityImports.fold(0,
-        (int lastIdx, ImportDirective node) {
-      buf.write(_code.substring(lastIdx, node.offset));
-      if ('${node.prefix}' == _codegen.prefix) {
-        logger.warning(
-            'Found import prefix "${_codegen.prefix}" in source file.'
-            ' Transform may not succeed.');
-      }
-      if (_mirrorMode != MirrorMode.none) {
-        buf.write(_importDebugReflectionCapabilities(node));
-      } else {
-        buf.write(_commentedNode(node));
-      }
-      if (!importAdded && _writeStaticInit) {
-        buf.write(_codegen.codegenImport());
-        importAdded = true;
-      }
-      return node.end;
-    });
-
-    var setupAdded = false;
-    idx = visitor.reflectionCapabilityAssignments.fold(idx,
-        (int lastIdx, AssignmentExpression assignNode) {
-      var node = assignNode;
-      while (node.parent is ExpressionStatement) {
-        node = node.parent;
-      }
-      buf.write(_code.substring(lastIdx, node.offset));
-      switch (_mirrorMode) {
-        case MirrorMode.debug:
-          buf.write(node);
-          break;
-        case MirrorMode.verbose:
-          buf.write(_instantiateVerboseReflectionCapabilities(assignNode));
-          break;
-        case MirrorMode.none:
-        default:
-          buf.write(_commentedNode(node));
-          break;
-      }
-      if (!setupAdded && _writeStaticInit) {
-        buf.write(_codegen.codegenSetupReflectionCall(
-            reflectorAssignment: assignNode));
-        setupAdded = true;
-      }
-      return node.end;
-    });
-    if (idx < _code.length) buf.write(_code.substring(idx));
-    return buf.toString();
+    buf.write(_code.substring(0, visitor.angular2Import.offset));
+    buf.write('import \'$ANGULAR_STATIC_IMPORT\';');
+    buf.write(_codegen.codegenImport());
+    buf.write(_code.substring(
+        visitor.angular2Import.end, visitor.bootstrapCall.offset));
+    buf.write(_codegen.codegenBootstrapCall(visitor.bootstrapCall));
+    // need the +1 to get rid of the semicolon.
+    buf.write(_code.substring(visitor.bootstrapCall.end + 1));
+    return '$buf';
   }
 
-  String _instantiateVerboseReflectionCapabilities(
-      AssignmentExpression assignNode) {
-    if (assignNode.rightHandSide is! InstanceCreationExpression) {
-      return '$assignNode;';
-    }
-    var rhs = (assignNode.rightHandSide as InstanceCreationExpression);
-    return '${assignNode.leftHandSide} ${assignNode.operator} '
-        'new ${rhs.constructorName}(verbose: true);';
-  }
+//    var importAdded = false;
+//    var buf = new StringBuffer();
+//    var idx = visitor.reflectionCapabilityImports.fold(0,
+//        (int lastIdx, ImportDirective node) {
+//      buf.write(_code.substring(lastIdx, node.offset));
+//      if ('${node.prefix}' == _codegen.prefix) {
+//        logger.warning(
+//            'Found import prefix "${_codegen.prefix}" in source file.'
+//            ' Transform may not succeed.');
+//      }
+//      if (_mirrorMode != MirrorMode.none) {
+//        buf.write(_importDebugReflectionCapabilities(node));
+//      } else {
+//        buf.write(_commentedNode(node));
+//      }
+//      if (!importAdded && _writeStaticInit) {
+//        buf.write(_codegen.codegenImport());
+//        importAdded = true;
+//      }
+//      return node.end;
+//    });
+//
+//    var setupAdded = false;
+//    idx = visitor.reflectionCapabilityAssignments.fold(idx,
+//        (int lastIdx, AssignmentExpression assignNode) {
+//      var node = assignNode;
+//      while (node.parent is ExpressionStatement) {
+//        node = node.parent;
+//      }
+//      buf.write(_code.substring(lastIdx, node.offset));
+//      switch (_mirrorMode) {
+//        case MirrorMode.debug:
+//          buf.write(node);
+//          break;
+//        case MirrorMode.verbose:
+//          buf.write(_instantiateVerboseReflectionCapabilities(assignNode));
+//          break;
+//        case MirrorMode.none:
+//        default:
+//          buf.write(_commentedNode(node));
+//          break;
+//      }
+//      if (!setupAdded && _writeStaticInit) {
+//        buf.write(_codegen.codegenSetupReflectionCall(
+//            reflectorAssignment: assignNode));
+//        setupAdded = true;
+//      }
+//      return node.end;
+//    });
+//    if (idx < _code.length) buf.write(_code.substring(idx));
+//    return buf.toString();
+//  }
 
-  String _importDebugReflectionCapabilities(ImportDirective node) {
-    var uri = '${node.uri}';
-    uri = path
-        .join(path.dirname(uri), 'debug_${path.basename(uri)}')
-        .replaceAll('\\', '/');
-    var asClause = node.prefix != null ? ' as ${node.prefix}' : '';
-    return 'import $uri$asClause;';
-  }
-
-  String _commentedNode(AstNode node) {
-    return '/*${_code.substring(node.offset, node.end)}*/';
-  }
+//  String _instantiateVerboseReflectionCapabilities(
+//      AssignmentExpression assignNode) {
+//    if (assignNode.rightHandSide is! InstanceCreationExpression) {
+//      return '$assignNode;';
+//    }
+//    var rhs = (assignNode.rightHandSide as InstanceCreationExpression);
+//    return '${assignNode.leftHandSide} ${assignNode.operator} '
+//        'new ${rhs.constructorName}(verbose: true);';
+//  }
+//
+//  String _importDebugReflectionCapabilities(ImportDirective node) {
+//    var uri = '${node.uri}';
+//    uri = path
+//        .join(path.dirname(uri), 'debug_${path.basename(uri)}')
+//        .replaceAll('\\', '/');
+//    var asClause = node.prefix != null ? ' as ${node.prefix}' : '';
+//    return 'import $uri$asClause;';
+//  }
+//
+//  String _commentedNode(AstNode node) {
+//    return '/*${_code.substring(node.offset, node.end)}*/';
+//  }
 }
 
-/// Visitor responsible for rewriting the Angular 2 code which instantiates
-/// {@link ReflectionCapabilities} and removing its associated import.
-///
-/// This breaks our dependency on dart:mirrors, which enables smaller code
-/// size and better performance.
-class _FindReflectionCapabilitiesVisitor extends Object
-    with RecursiveAstVisitor<Object> {
-  final reflectionCapabilityImports = new List<ImportDirective>();
-  final reflectionCapabilityAssignments = new List<AssignmentExpression>();
+/// Visitor responsible for finding the Angular 2 `boostrap` call and import to
+/// 1angular2.dart`.
+class _FindPartsVisitor extends RecursiveAstVisitor {
+  ImportDirective angular2Import;
+  MethodInvocation bootstrapCall;
   final AstTester _tester;
 
-  _FindReflectionCapabilitiesVisitor(this._tester);
+  _FindPartsVisitor(this._tester);
 
   @override
-  Object visitImportDirective(ImportDirective node) {
-    if (_tester.isReflectionCapabilitiesImport(node)) {
-      reflectionCapabilityImports.add(node);
+  visitImportDirective(ImportDirective node) {
+    if (_tester.isAngular2Import(node)) {
+      angular2Import = node;
     }
-    return null;
   }
 
-  @override
-  Object visitAssignmentExpression(AssignmentExpression node) {
-    if (node.rightHandSide is InstanceCreationExpression &&
-        _tester.isNewReflectionCapabilities(node.rightHandSide)) {
-      reflectionCapabilityAssignments.add(node);
+  @override visitMethodInvocation(MethodInvocation node) {
+    if (_tester.isBootstrap(node)) {
+      bootstrapCall = node;
     }
-    return super.visitAssignmentExpression(node);
-  }
-
-  @override
-  Object visitInstanceCreationExpression(InstanceCreationExpression node) {
-    if (_tester.isNewReflectionCapabilities(node) &&
-        !reflectionCapabilityAssignments.contains(node.parent)) {
-      logger.error('Unexpected format in creation of '
-          '${REFLECTION_CAPABILITIES_NAME}');
-    }
-    return super.visitInstanceCreationExpression(node);
   }
 }
